@@ -3,6 +3,7 @@ from requests import post, get
 import json
 import datetime
 from urllib.parse import urlencode
+import time
 
 client_id = "2630db6077e3463ab075a88b69cb120e"
 client_secret = "ff314ca0a3f941a999638e2e40e53fdf"
@@ -62,7 +63,7 @@ class SpotifyAPI(object):
         self.access_token = access_token
         self.access_token_expiration = expires
         self.access_token_did_expire = expires < now
-        print(expires)
+        # print(expires)
         return True
     
 
@@ -91,7 +92,7 @@ class SpotifyAPI(object):
 
 
     def get_resource(self, lookup_id, resource_type='albums', version='v1', search_type='None'):
-        endpoint = f"https://api.spotify.com/{version}/{resource_type}/{lookup_id}/{search_type}"
+        endpoint = f"https://api.spotify.com/{version}/{resource_type}/{lookup_id}/{search_type}?country=US"
         headers = self.get_resource_header()
         results = get(endpoint, headers=headers)
         if results.status_code not in range(200, 299):
@@ -105,8 +106,10 @@ class SpotifyAPI(object):
         json_results = get_resource['items']
         return json_results
 
-    def get_artist(self, _id):
-        return self.get_resource(_id, resource_type='artists', search_type='top-tracks')
+    def get_artist_top_tracks(self, _id):
+        get_resource = self.get_resource(_id, resource_type='artists', search_type='top-tracks')
+        json_results = get_resource['tracks']
+        return json_results
 
 
 
@@ -114,16 +117,18 @@ class SpotifyAPI(object):
         headers = self.get_resource_header()
 
         endpoint = "https://api.spotify.com/v1/search"
-        # data = urlencode({"q": query_params, "type": search_type, "limit": "1"})
-        # print(data)
+
         lookup_url = f"{endpoint}?{query_params}"
         results = get(lookup_url, headers=headers)
-        print(results.status_code)
+        # print(results.status_code)
         if results.status_code not in range(200, 299):
             return {}
-        json_results = json.loads(results.content)['artists']['items']
+        json_results = results.json()['artists']['items']
+        if len(json_results) == 0:
+            print("No artist with that name exists...")
+            return None
         return json_results[0]
-        # return results.json()
+        
 
 
     def search(self, query=None, operator=None, operator_query=None, search_type='artist'):
@@ -136,31 +141,62 @@ class SpotifyAPI(object):
                     operator = operator.upper()
                     if isinstance(operator_query, str):
                         query = f"{query} {operator} {operator_query}"
-        query_params = urlencode({"q": query, "type": search_type.lower()})
+        query_params = urlencode({"q": query, "type": search_type.lower(), "limit":'1'})
         
         return self.search_for_query(query_params)
 
 
 
+# Function to call what data you would like to pull
+    def get_which_data(self):
+        choice = 'none'
+ 
+        while choice not in ['1','2']:
+            print("Which artist data are you looking for?")
+            time.sleep(.3)
+            print("For top songs, type: 1")
+            time.sleep(.3)
+            print("For their albums, type: 2")
+            time.sleep(.3)
+            choice = input("Choose:  ")
+        if choice not in ['1','2']:
+            print("Choices are: ")
+            time.sleep(.3)
+            print("Top songs which is: 1")
+            time.sleep(.3)
+            print("Albums which is 2")
+        return int(choice)
+    
+    def return_data(self, dataChoice, artist_id):
+        if dataChoice == 2:
+            artist_albums = self.get_artist_albums(artist_id)
+            for idx, album in enumerate(artist_albums):
+                print(f"{idx + 1}. {album['name']}")
+                
+        elif dataChoice == 1:
+            artistSongs = self.get_artist_top_tracks(artist_id)
+            for idx, song in enumerate(artistSongs):
+                print(f"{idx + 1}. {song['name']}")
+                
+        
 
 
 
 
 
+def put_together():
+    query_params = str(input("What artist to search for?: "))
+    client = SpotifyAPI(client_id, client_secret)
+    # print(client.perform_auth())
+    results = client.search(query_params)
+    artist_id = results["id"]
+    data = client.get_which_data()
+    client.return_data(data, artist_id)
+    
 
 
 def main():
-    query_params = str(input("Search for: "))
-    client = SpotifyAPI(client_id, client_secret)
-    print(client.perform_auth())
-    results = client.search(query_params)
-    artist_id = results["id"]
-    print(artist_id)
-    artist_albums = client.get_artist_albums(artist_id)
-    # print(artist_albums)
-
-    for idx, album in enumerate(artist_albums):
-        print(f"{idx + 1}. {album['name']}")
+    put_together()
 
 
 
